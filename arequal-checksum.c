@@ -115,13 +115,49 @@ checksum_md5 (const char *path, const struct stat *sb)
 {
         uint64_t    this_data_checksum = 0;
 	FILE       *filep              = NULL;
-	char        cmd[4096 + 64]     = {0,};
+	char        *cmd               = NULL;
 	char        strvalue[17]       = {0,};
 	int         ret                = -1;
-
-
-        sprintf (cmd, "md5sum '%s'", path);
-
+	int         len                = 0;
+	const char  *pos               = NULL;
+	char        *cpos              = NULL;
+	
+	/* Have to escape single-quotes in filename.
+	 * First, calculate the size of the buffer I'll need.
+	 */
+	for (pos = path; *pos; pos++) {
+		if ( *pos == '\'' )
+			len += 4;
+		else
+			len += 1;
+	}
+	
+	cmd = malloc(sizeof(char) * (len + 20));
+	cmd[0] = '\0';
+	
+	/* Now, build the command with single quotes escaped. */
+	
+	cpos = cmd;
+	strcpy(cpos, "md5sum '");
+	cpos += 8;
+	
+	/* Add the file path, with every single quotes replaced with this sequence:
+	 * '\''
+	 */
+	 
+	for (pos = path; *pos; pos++) {
+		if ( *pos == '\'' ) {
+			strcpy(cpos, "'\\''");
+			cpos += 4;
+		} else {
+			*cpos = *pos;
+			cpos++;
+		}
+	}
+	
+	/* Add on the trailing single-quote and null-terminate. */
+	strcpy(cpos, "'");
+	
         filep = popen (cmd, "r");
         if (!filep) {
 		perror (path);
@@ -156,6 +192,9 @@ checksum_md5 (const char *path, const struct stat *sb)
 out:
 	if (filep)
 		pclose (filep);
+	
+	if (cmd)
+		free(cmd);
 
         return ret;
 }
